@@ -1,8 +1,8 @@
-package main
+package core
 
 import (
-    "math"
-    "fmt"
+	"fmt"
+	"math"
 )
 
 type Vec struct {
@@ -25,8 +25,8 @@ func (v *Vec) plusAll(d float64) {
     v.Z += d;
 }
 
-func (v *Vec) minus(other *Vec) Vec {
-    return Vec{X: (v.X - other.X), Y: (v.Y - other.Y), Z: (v.Z - other.Z)}
+func (v *Vec) Minus(other *Vec) *Vec {
+    return &Vec{X: (v.X - other.X), Y: (v.Y - other.Y), Z: (v.Z - other.Z)}
 }
 
 func (v *Vec) minusM(other *Vec) {
@@ -59,7 +59,7 @@ func (v *Vec) length() float64 {
     return math.Sqrt(v.X*v.X + v.Y*v.Y + v.Z*v.Z)
 }
 
-func (v *Vec) normalize() *Vec {
+func (v *Vec) Normalize() *Vec {
     len := math.Sqrt(v.X*v.X + v.Y*v.Y + v.Z*v.Z);
     if len == 0.0 { return v }
     return &Vec{v.X/len, v.Y/len, v.Z/len}

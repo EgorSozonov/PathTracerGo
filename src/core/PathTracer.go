@@ -1,8 +1,11 @@
-package main
+package core
 
 import (
 	"math"
 	"math/rand"
+	"sync"
+
+	"github.com/EgorSozonov/PathTracerGo/src/ports"
 )
 
 var (
@@ -15,7 +18,7 @@ var (
     dX = Vec{0.01, 0, 0}
     dY = Vec{0, 0.01, 0}
     dZ = Vec{0, 0, 0.01}
-    lightDirection = (&Vec{0.3, 0.6, 0.4}).normalize()
+    lightDirection = (&Vec{0.3, 0.6, 0.4}).Normalize()
     colorSun = Vec{50, 80, 100}
     colorWall = Vec{500, 400, 100}
 )
@@ -45,8 +48,8 @@ const (
 /// space carved by lowerLeft vertex and opposite rectangle vertex upperRight.
 /// Negative return value if point is inside, positive if outside.
 func probeBox(position *Vec, lowerLeft *Vec, upperRight *Vec) float64 {
-    fromLowerLeft := position.minus(lowerLeft);
-    toUpperRight := upperRight.minus(position);
+    fromLowerLeft := position.Minus(lowerLeft);
+    toUpperRight := upperRight.Minus(position);
 
     return -min(
                 min(min(fromLowerLeft.X, toUpperRight.X),
@@ -90,7 +93,7 @@ func rayMarching(origin *Vec, direction *Vec, hitPos *Vec, hitNorm *Vec) Hit {
 			normX := queryDatabase(hitPos.plus(&dX), &temp) - d;
 			normY := queryDatabase(hitPos.plus(&dY), &temp) - d;
 			normZ := queryDatabase(hitPos.plus(&dZ), &temp) - d;
-			hitNorm = (&Vec{ normX, normY, normZ }).normalize();
+			hitNorm = (&Vec{ normX, normY, normZ }).Normalize();
 			return hitType;
 		}
 	}
@@ -144,52 +147,55 @@ func trace(origin *Vec, direction *Vec) *Vec {
 	return &result;
 }
 
-func run(position *Vec, dirObersver *Vec, samplesCount int, w int, h int) {
-	dirLeft := (Vec{}).normalize()
+func Run(position *Vec, dirObserver *Vec, samplesCount int, w int, h int) {
+	dirLeft := (&Vec{ dirObserver.Z, 0, -dirObserver.X }).Normalize()
+	dirLeft.timesM(1.0 / float64(h))
+	dirUp := &Vec {
+		dirObserver.Y * dirLeft.Z - dirObserver.Z * dirLeft.Y,
+        dirObserver.Z * dirLeft.X - dirObserver.X * dirLeft.Z,
+        dirObserver.X * dirLeft.Y - dirObserver.Y * dirLeft.X,
+	}
+	dirUp.normalizeM()
+	dirUp.timesM(1.0 / float64(h));
+	pixels := make([]byte, 3*w*h);
+
+	var wg sync.WaitGroup
+
+	for y := h - 1; y > 0; y -= 1 {
+		wg.Add(1)
+		go worker(y, pixels, w, h, samplesCount, position, dirLeft, dirUp, dirObserver, &wg)
+
+	}
+	wg.Wait()
+	ports.CreateBMP(pixels, w, h, "card.bmp");
+
 }
 
-public void run(Vec position, Vec dirObserver, int samplesCount, int w, int h) {
-    Vec dirLeft = (new Vec(dirObserver.z, 0, -dirObserver.x)).normalize();
-    //dirLeft.timesM(1.0 / w);
-    dirLeft.timesM(1.0 / h);
-    // Cross-product to get the up vector
-
-    Vec dirUp = new Vec(dirObserver.y * dirLeft.z - dirObserver.z * dirLeft.y,
-                        dirObserver.z * dirLeft.x - dirObserver.x * dirLeft.z,
-                        dirObserver.x * dirLeft.y - dirObserver.y * dirLeft.x);
-    dirUp.normalizeM();
-    dirUp.timesM(1.0 / h);
-    byte[] pixels = new byte[3 * w * h];
-
-    Parallel.For (1, h - 1, (y) => {
-        for (int x = w; x > 0; --x) {
-            Vec color = new Vec(0, 0, 0);
-            for (int p = samplesCount; p > 0; --p) {
-                var randomLeft = dirLeft.times(x - w / 2 + rnd.NextDouble());
-                var randomUp = dirUp.times((y - h / 2 + rnd.NextDouble()));
-                var randomizedDir = new Vec(dirObserver.x, dirObserver.y, dirObserver.z);
-                randomizedDir.plusM(randomLeft);
-                randomizedDir.plusM(randomUp);
-                randomizedDir.normalizeM();
-                //Hit hType = Hit.None;
-                var incr = trace(position, randomizedDir);
-                if (y < h/2) {
-                    ;
-                }
-                color.plusM(incr);
-            }
-
-            // Reinhard tone mapping
-            color.timesM(241.0 / samplesCount);
-            color = new Vec((color.x + 14.0) / (color.x + 255.0),
-                            (color.y + 14.0) / (color.y + 255.0),
-                            (color.z + 14.0) / (color.z + 255.0));
-            color.timesM(255.0);
-            int index = 3 * (w * y - w + x - 1);
-            pixels[index    ] = (byte)color.x;
-            pixels[index + 1] = (byte)color.y;
-            pixels[index + 2] = (byte)color.z;
-        }
-    });
-    Output.createBMP(pixels, w, h, "card.bmp");
+func worker(y int, pixels []byte, w int, h int, samplesCount int, position *Vec, 
+			dirLeft *Vec, dirUp *Vec, dirObserver *Vec,
+			wg *sync.WaitGroup) {
+	for x := w; x > 0; x -= 1 {
+		color := Vec { 0.0, 0.0, 0.0 }
+		for p := samplesCount; p > 0; p -= 1 {
+			randomLeft := dirLeft.times(float64(x - w/2) + rand.Float64());
+			randomUp := dirUp.times(float64(y - h/2) + rand.Float64());
+			randomizedDir := Vec {dirObserver.X, dirObserver.Y, dirObserver.Z };
+			randomizedDir.plusM(randomLeft);
+			randomizedDir.plusM(randomUp);
+			incr := trace(position, &randomizedDir);
+			color.plusM(incr)
+		}
+		// Reinhard tone mapping
+		color.timesM(241.0/float64(samplesCount))
+		color = Vec {X: (color.X + 14.0)/(color.X + 255.0),
+					  Y: (color.Y + 14.0)/(color.Y + 255.0),
+					  Z: (color.Z + 14.0)/(color.Z + 255.0),
+		};
+		color.timesM(255.0);
+		index := 3*(w*y - w + x - 1);
+		pixels[index    ] = byte(color.X);
+		pixels[index + 1] = byte(color.Y);
+		pixels[index + 2] = byte(color.Z);
+	}
+	wg.Done()
 }
