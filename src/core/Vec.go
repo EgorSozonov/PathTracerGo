@@ -9,8 +9,8 @@ type Vec struct {
     X, Y, Z float64
 }
 
-func (v *Vec) plus(other *Vec) Vec {
-    return Vec{X: (v.X + other.X), Y: (v.Y + other.Y), Z: (v.Z + other.Z)}
+func (v *Vec) plus(other *Vec) *Vec {
+    return &Vec{X: (v.X + other.X), Y: (v.Y + other.Y), Z: (v.Z + other.Z)}
 }
 
 func (v *Vec) plusM(other *Vec) {
@@ -41,8 +41,8 @@ func (v *Vec) vecTimesM(other *Vec) {
     v.Z *= other.Z;
 }
 
-func (v *Vec) times(d float64) Vec {
-    return Vec{X: v.X*d, Y: v.Y*d, Z: v.Z*d}
+func (v *Vec) times(d float64) *Vec {
+    return &Vec{X: v.X*d, Y: v.Y*d, Z: v.Z*d}
 }
 
 func (v *Vec) timesM(d float64) {
