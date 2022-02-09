@@ -58,7 +58,6 @@ func probeBox(position *Vec, lowerLeft *Vec, upperRight *Vec) float64 {
 }
 
 
-
 func queryDatabase(position *Vec, hit *Hit) float64 {    
     distance := math.Max(1e9, position.X) - 0.5;
     *hit = Figure;
@@ -79,16 +78,16 @@ func queryDatabase(position *Vec, hit *Hit) float64 {
     return distance;
 }
 
+
 func rayMarching(origin *Vec, direction *Vec, hitPos *Vec, hitNorm *Vec) Hit {
 	var hitType Hit = None
 	noHitCount := 0
 	d := 0.0 // distance from the closest object in the world.
 	for totalD := 0.0; totalD < 100.0; totalD += d {
-
 		hitPos = origin.plus(direction.times(totalD))
 		d = queryDatabase(hitPos, &hitType)
+		if d >= 0.01 { noHitCount += 1 }
 		if d < 0.01 || noHitCount > 99 {
-			noHitCount += 1
 			temp := None
 			normX := queryDatabase(hitPos.plus(&dX), &temp) - d;
 			normY := queryDatabase(hitPos.plus(&dY), &temp) - d;
@@ -99,6 +98,7 @@ func rayMarching(origin *Vec, direction *Vec, hitPos *Vec, hitNorm *Vec) Hit {
 	}
 	return None
 }
+
 
 func trace(origin *Vec, direction *Vec) *Vec {
 	hitPoint := Vec { 0, 0, 0 }
@@ -127,29 +127,32 @@ func trace(origin *Vec, direction *Vec) *Vec {
 			a.timesM(s * math.Cos(p));
 			b := Vec { 1 + g*normal.X*normal.X*u, g*v, -g*normal.X }
 			b.timesM(s * math.Sin(p));
+
 			newDirection = a;
-			newDirection.plusM(&b);
-			newDirection.plusM(normal.times(math.Sqrt(c)));
+			newDirection.plusM(b);
+			newDirection.plusM(*normal.times(math.Sqrt(c)));
 			newOrigin = hitPoint.plus(newDirection.times(0.1))
 			attenuation *= 0.2;
 			ptAbove := hitPoint.plus(normal.times(0.1));
 			if incidence > 0 {
 				tmp := rayMarching(ptAbove, lightDirection, &hitPoint, &normal)
 				if tmp == Sun {
-					result.plusM(colorWall.times(attenuation*incidence));
+					result.plusM(*colorWall.times(attenuation*incidence));
 				}
 			}
 		} else if hitType == Sun {
-			result.plusM(colorSun.times(attenuation));
+			result.plusM(*colorSun.times(attenuation));
 			break;
 		}
 	}
 	return &result;
 }
 
+
 func Run(position *Vec, dirObserver *Vec, samplesCount int, w int, h int) {
 	dirLeft := (&Vec{ dirObserver.Z, 0, -dirObserver.X }).Normalize()
 	dirLeft.timesM(1.0 / float64(h))
+
 	dirUp := &Vec {
 		dirObserver.Y * dirLeft.Z - dirObserver.Z * dirLeft.Y,
         dirObserver.Z * dirLeft.X - dirObserver.X * dirLeft.Z,
@@ -157,33 +160,34 @@ func Run(position *Vec, dirObserver *Vec, samplesCount int, w int, h int) {
 	}
 	dirUp.normalizeM()
 	dirUp.timesM(1.0 / float64(h));
+
 	pixels := make([]byte, 3*w*h);
 
 	var wg sync.WaitGroup
-
-	for y := h - 1; y > 0; y -= 1 {
-		wg.Add(1)
-		go worker(y, pixels, w, h, samplesCount, position, dirLeft, dirUp, dirObserver, &wg)
-
+	wg.Add(h - 2)
+	for y := h - 2; y > 0; y -= 1 {		
+		go worker(y, pixels, w, h, samplesCount, position, *dirLeft, *dirUp, *dirObserver, &wg)
 	}
 	wg.Wait()
 	ports.CreateBMP(pixels, w, h, "card.bmp");
-
 }
 
+
 func worker(y int, pixels []byte, w int, h int, samplesCount int, position *Vec, 
-			dirLeft *Vec, dirUp *Vec, dirObserver *Vec,
+			dirLeft Vec, dirUp Vec, dirObserver Vec,
 			wg *sync.WaitGroup) {
+	defer wg.Done()
 	for x := w; x > 0; x -= 1 {
 		color := Vec { 0.0, 0.0, 0.0 }
 		for p := samplesCount; p > 0; p -= 1 {
-			randomLeft := dirLeft.times(float64(x - w/2) + rand.Float64());
-			randomUp := dirUp.times(float64(y - h/2) + rand.Float64());
+			randomLeft := dirLeft.times(float64(x - (w/2)) + rand.Float64());
+			randomUp := dirUp.times(float64(y - (h/2)) + rand.Float64());
 			randomizedDir := Vec {dirObserver.X, dirObserver.Y, dirObserver.Z };
-			randomizedDir.plusM(randomLeft);
-			randomizedDir.plusM(randomUp);
+			randomizedDir.plusM(*randomLeft);
+			randomizedDir.plusM(*randomUp);
+			randomizedDir.normalizeM();
 			incr := trace(position, &randomizedDir);
-			color.plusM(incr)
+			color.plusM(*incr)
 		}
 		// Reinhard tone mapping
 		color.timesM(241.0/float64(samplesCount))
@@ -192,10 +196,10 @@ func worker(y int, pixels []byte, w int, h int, samplesCount int, position *Vec,
 					  Z: (color.Z + 14.0)/(color.Z + 255.0),
 		};
 		color.timesM(255.0);
+		
 		index := 3*(w*y - w + x - 1);
 		pixels[index    ] = byte(color.X);
 		pixels[index + 1] = byte(color.Y);
 		pixels[index + 2] = byte(color.Z);
 	}
-	wg.Done()
 }

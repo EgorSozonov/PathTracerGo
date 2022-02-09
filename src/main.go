@@ -2,14 +2,17 @@ package main
 
 import (
 	"fmt"
+	"runtime"
+
 	//"github.com/EgorSozonov/PathTracerGo/src/ports"
+
 	"time"
 
 	"github.com/EgorSozonov/PathTracerGo/src/core"
 )
 
 func main() {
-    fmt.Println("Hello, world!");
+    
     // testData := []byte { 0, 255, 0, 0, 255, 0, 0, 255, 0, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127,
     // 255, 0, 0, 255, 0, 0, 255, 0, 0, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127,
     // 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127,
@@ -21,17 +24,27 @@ func main() {
     // 255, 0, 0, 255, 0, 0, 255, 0, 0, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127,
     // };
     // ports.CreateBMP(testData, 16, 9, "test.bmp");
+	runtime.GOMAXPROCS(16)
 	w := 320
 	h := 180
-	samplesCount := 32
-	position := &core.Vec{-22, 5, 25}
-	dirObserver := (&core.Vec{-10, 4, 0}).Minus(position).Normalize()
-
+	samplesCount := 128
+	position := &core.Vec{X: -22, Y: 5, Z: 25}
+	dirObserver := (&core.Vec{X: -10, Y: 4, Z: 0}).Minus(position).Normalize()
+	fmt.Printf("Golang has started path tracing with sampleCount %d\n", samplesCount);
 	tsStart := time.Now()
+
+	// cpuProf, _ := os.Create("CpuProfile.pprof")
+	// defer cpuProf.Close()
+
+	// if cpuErr := pprof.StartCPUProfile(cpuProf); cpuErr != nil {
+	// 	fmt.Printf("Cpu profiling error")
+	// 	return
+	// }
+	// defer pprof.StopCPUProfile()
 
 	core.Run(position, dirObserver, samplesCount, w, h)
 
 	timeElapsed := time.Since(tsStart)
-    fmt.Printf("Finished in took %s", timeElapsed)	
+    fmt.Printf("Finished in  %s s\n", timeElapsed)	
     return;
 }

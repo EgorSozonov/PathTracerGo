@@ -13,7 +13,7 @@ func (v *Vec) plus(other *Vec) *Vec {
     return &Vec{X: (v.X + other.X), Y: (v.Y + other.Y), Z: (v.Z + other.Z)}
 }
 
-func (v *Vec) plusM(other *Vec) {
+func (v *Vec) plusM(other Vec) {
     v.X += other.X;
     v.Y += other.Y;
     v.Z += other.Z;
